@@ -1,1 +1,2 @@
 # (# 🚀 YOLOv8 Object Detection on Video person-identification-using-deep-learning-model)
+This project uses YOLOv8 to perform real-time object detection on a video file. The script detects objects like persons and vehicles, draws bounding boxes with class labels, and saves the output as a new annotated video. It also extracts and saves cropped images of detected persons and vehicles for further analysis or training.
