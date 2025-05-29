@@ -1,0 +1,83 @@
+import cv2
+import os
+from ultralytics import YOLO
+
+# --- Paths ---
+DATA_FOLDER = r"D:\Newporject\data"
+OUTPUT_FOLDER = r"D:\Newporject\output"
+
+VIDEO_PATH = os.path.join(DATA_FOLDER, "cam1.mp4")
+OUTPUT_PATH = os.path.join(OUTPUT_FOLDER, "processed_video.mp4")
+
+# Create folders for saving detected objects
+PERSON_FOLDER = os.path.join(OUTPUT_FOLDER, "persons")
+VEHICLE_FOLDER = os.path.join(OUTPUT_FOLDER, "vehicles")
+os.makedirs(PERSON_FOLDER, exist_ok=True)
+os.makedirs(VEHICLE_FOLDER, exist_ok=True)
+
+# --- Load YOLOv8 model ---
+model = YOLO('yolov8x.pt')  # You can also use 'yolov8n.pt' for faster performance
+
+# --- Open video ---
+cap = cv2.VideoCapture(VIDEO_PATH)
+if not cap.isOpened():
+    raise Exception("Error: Cannot open video file.")
+
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+# --- Output video writer ---
+out = cv2.VideoWriter(OUTPUT_PATH, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+
+# --- Set to keep track of saved images ---
+saved_persons = set()
+saved_vehicles = set()
+
+# --- Process each frame ---
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Run YOLOv8 model
+    results = model(frame)[0]
+
+    # Draw bounding boxes and labels
+    for box in results.boxes:
+        cls_id = int(box.cls[0])
+        conf = float(box.conf[0])
+        x1, y1, x2, y2 = map(int, box.xyxy[0])
+        label = model.names[cls_id]
+
+        # Draw rectangle and label
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(frame, f"{label} {conf:.2f}", (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+        # Save detected object images
+        if label == "person":
+            # Create a unique filename for the person image
+            person_image_name = f"person_{len(saved_persons) + 1}.jpg"
+            person_image_path = os.path.join(PERSON_FOLDER, person_image_name)
+            if person_image_name not in saved_persons:
+                cv2.imwrite(person_image_path, frame[y1:y2, x1:x2])
+                saved_persons.add(person_image_name)
+
+        elif label in ["car", "truck", "bus", "motorcycle", "bicycle"]:
+            # Create a unique filename for the vehicle image
+            vehicle_image_name = f"vehicle_{len(saved_vehicles) + 1}.jpg"
+            vehicle_image_path = os.path.join(VEHICLE_FOLDER, vehicle_image_name)
+            if vehicle_image_name not in saved_vehicles:
+                cv2.imwrite(vehicle_image_path, frame[y1:y2, x1:x2])
+                saved_vehicles.add(vehicle_image_name)
+
+    # Write frame to output
+    out.write(frame)
+
+# --- Release resources ---
+cap.release()
+out.release()
+print("✅ Object detection completed. Output saved at:", OUTPUT_PATH)
+print(f"✅ Detected person images saved in: {PERSON_FOLDER}")
+print(f"✅ Detected vehicle images saved in: {VEHICLE_FOLDER}")
